@@ -1,7 +1,7 @@
-// --- CONFIGURAÇÃO DOS MODELOS (Versão Compatibilidade) ---
+// --- CONFIGURAÇÃO DOS MODELOS (Padrão Oficial Google AI Studio) ---
 const MODELS = {
-    // Google: Usando 'gemini-pro' (versão 1.0) que é compatível com todas as chaves
-    gemini: 'gemini-pro', 
+    // O modelo padrão gratuito atual é o 1.5 Flash
+    gemini: 'gemini-1.5-flash', 
     
     // Groq: Llama 3.3 (Smart)
     groqSmart: 'llama-3.3-70b-versatile', 
@@ -17,40 +17,45 @@ document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('config-modal');
     const saveKeysBtn = document.getElementById('save-keys');
 
+    // Carrega chaves salvas
     loadKeys();
 
     // -- Modal Config --
     configBtn.onclick = () => modal.classList.remove('hidden');
+    
     saveKeysBtn.onclick = () => {
+        // .trim() é vital para evitar erros de "Not Found" por espaço vazio
         const geminiVal = document.getElementById('gemini-key').value.trim();
         const groqVal = document.getElementById('groq-key').value.trim();
         
-        localStorage.setItem('gemini_key', geminiVal);
-        localStorage.setItem('groq_key', groqVal);
+        if(geminiVal) localStorage.setItem('gemini_key', geminiVal);
+        if(groqVal) localStorage.setItem('groq_key', groqVal);
+        
         modal.classList.add('hidden');
-        alert('Chaves salvas! Tente enviar o prompt novamente.');
+        alert('Chaves salvas! Tente disparar novamente.');
     };
 
-    // -- Enviar Prompt --
+    // -- Botão Enviar --
     sendBtn.onclick = async () => {
         const prompt = promptInput.value;
         if (!prompt) return alert('Digite um prompt!');
 
+        // Recupera as chaves limpas
         const geminiKey = localStorage.getItem('gemini_key');
         const groqKey = localStorage.getItem('groq_key');
 
         if (!geminiKey || !groqKey) {
-            alert('Configure as chaves API primeiro!');
+            alert('Configure as chaves API primeiro no botão de engrenagem!');
             modal.classList.remove('hidden');
             return;
         }
 
-        // Resetar UI
-        setLoading('gemini', 'Gemini Pro');
+        // Resetar UI e Timers
+        setLoading('gemini', 'Gemini 1.5 Flash');
         setLoading('groq1', 'Llama 3.3 (Smart)');
         setLoading('groq2', 'Llama 3.1 (Fast)');
 
-        // Disparar requisições
+        // Disparar requisições em paralelo
         fetchGemini(prompt, geminiKey);
         fetchGroq(prompt, groqKey, MODELS.groqSmart, 'groq1');
         fetchGroq(prompt, groqKey, MODELS.groqFast, 'groq2');
@@ -88,11 +93,11 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>`;
     }
 
-    // --- GOOGLE GEMINI (Versão PRO - Mais compatível) ---
+    // --- GOOGLE GEMINI (Endpoint V1BETA + MODELO FLASH) ---
     async function fetchGemini(prompt, apiKey) {
         const start = performance.now();
         try {
-            // URL usando a versão v1beta e o modelo gemini-pro
+            // Esta é a URL exata da documentação oficial para Free Tier
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini}:generateContent?key=${apiKey}`;
             
             const response = await fetch(url, {
@@ -104,14 +109,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             
             if (data.error) {
-                // Se der erro aqui, a chave é realmente inválida
-                throw new Error(data.error.message);
+                // Tratamento de erro detalhado
+                let errorMsg = data.error.message;
+                if(errorMsg.includes('API key not valid')) errorMsg = "Sua chave API está inválida.";
+                if(errorMsg.includes('not found')) errorMsg = "O modelo Flash não está ativado na sua chave ou região.";
+                throw new Error(errorMsg);
             }
 
             const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sem resposta.";
             updateResult('gemini', text, start);
         } catch (error) {
-            showError('gemini', "Verifique sua chave ou gere uma nova em aistudio.google.com. Detalhe: " + error.message);
+            showError('gemini', error.message);
         }
     }
 
@@ -136,7 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.error) {
                 if (data.error.code === 'model_not_found') {
-                    throw new Error(`Modelo descontinuado.`);
+                    throw new Error(`Modelo descontinuado pela Groq.`);
                 }
                 throw new Error(data.error.message);
             }
