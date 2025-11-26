@@ -1,11 +1,11 @@
 // --- CONFIGURAÇÃO DOS MODELOS (Padrão Oficial Google AI Studio) ---
 const MODELS = {
-    // O modelo padrão gratuito atual é o 1.5 Flash
-    gemini: 'gemini-1.5-flash', 
-    
+    // Novo nome correto do modelo Gemini na API atual
+    gemini: 'gemini-1.5-flash-latest',
+
     // Groq: Llama 3.3 (Smart)
-    groqSmart: 'llama-3.3-70b-versatile', 
-    
+    groqSmart: 'llama-3.3-70b-versatile',
+
     // Groq: Llama 3.1 (Fast)
     groqFast: 'llama-3.1-8b-instant'
 };
@@ -22,15 +22,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // -- Modal Config --
     configBtn.onclick = () => modal.classList.remove('hidden');
-    
+
     saveKeysBtn.onclick = () => {
-        // .trim() é vital para evitar erros de "Not Found" por espaço vazio
         const geminiVal = document.getElementById('gemini-key').value.trim();
         const groqVal = document.getElementById('groq-key').value.trim();
-        
-        if(geminiVal) localStorage.setItem('gemini_key', geminiVal);
-        if(groqVal) localStorage.setItem('groq_key', groqVal);
-        
+
+        if (geminiVal) localStorage.setItem('gemini_key', geminiVal);
+        if (groqVal) localStorage.setItem('groq_key', groqVal);
+
         modal.classList.add('hidden');
         alert('Chaves salvas! Tente disparar novamente.');
     };
@@ -82,8 +81,12 @@ document.addEventListener('DOMContentLoaded', () => {
             contentDiv.innerText = text;
         }
         const duration = ((performance.now() - startTime) / 1000).toFixed(2);
-        const timerEl = document.getElementById(id === 'gemini' ? 'timer-gemini' : (id === 'groq1' ? 'timer-groq1' : 'timer-groq2'));
-        if(timerEl) timerEl.innerText = `${duration}s`;
+        const timerEl = document.getElementById(
+            id === 'gemini' ? 'timer-gemini' :
+            id === 'groq1' ? 'timer-groq1' :
+            'timer-groq2'
+        );
+        if (timerEl) timerEl.innerText = `${duration}s`;
     }
 
     function showError(id, msg) {
@@ -93,31 +96,41 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>`;
     }
 
-    // --- GOOGLE GEMINI (Endpoint V1BETA + MODELO FLASH) ---
+    // --- GOOGLE GEMINI (API nova, v1 + modelo atualizado) ---
     async function fetchGemini(prompt, apiKey) {
         const start = performance.now();
         try {
-            // Esta é a URL exata da documentação oficial para Free Tier
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini}:generateContent?key=${apiKey}`;
-            
+            const url = `https://generativelanguage.googleapis.com/v1/models/${MODELS.gemini}:generateContent?key=${apiKey}`;
+
             const response = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contents: [
+                        {
+                            role: "user",
+                            parts: [{ text: prompt }]
+                        }
+                    ]
+                })
             });
 
             const data = await response.json();
-            
+
             if (data.error) {
-                // Tratamento de erro detalhado
-                let errorMsg = data.error.message;
-                if(errorMsg.includes('API key not valid')) errorMsg = "Sua chave API está inválida.";
-                if(errorMsg.includes('not found')) errorMsg = "O modelo Flash não está ativado na sua chave ou região.";
-                throw new Error(errorMsg);
+                let msg = data.error.message || "Erro desconhecido.";
+                if (msg.includes("API key not valid")) msg = "Sua chave API está inválida.";
+                if (msg.includes("not found")) msg = "Modelo não disponível para sua chave.";
+                throw new Error(msg);
             }
 
-            const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sem resposta.";
+            // Novo formato da resposta
+            const text =
+                data?.candidates?.[0]?.content?.[0]?.text ||
+                "Sem resposta do Gemini.";
+
             updateResult('gemini', text, start);
+
         } catch (error) {
             showError('gemini', error.message);
         }
