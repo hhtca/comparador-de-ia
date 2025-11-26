@@ -1,6 +1,6 @@
 // --- CONFIGURAÇÃO DOS MODELOS ---
 const MODELS = {
-    // Modelo estável e rápido para sua chave
+    // Modelo 1.5 Flash (Rápido e barato/gratuito)
     gemini: 'gemini-1.5-flash', 
 
     // Groq: Llama 3.3 (Smart)
@@ -10,17 +10,24 @@ const MODELS = {
     groqFast: 'llama-3.1-8b-instant'
 };
 
-// SUA CHAVE DA API (Inserida conforme solicitado)
-const MY_GEMINI_KEY = 'AIzaSyBiJu8Uhv2SNjKLHhixP9FWsIaM4kVMjHw';
+// ---------------------------------------------------------
+// 🔒 COLE SUA NOVA CHAVE DO AI STUDIO ABAIXO (DENTRO DAS ASPAS)
+// ---------------------------------------------------------
+const MY_GEMINI_KEY = ''; 
 
 document.addEventListener('DOMContentLoaded', () => {
+    
+    // --- DICA: Se a chave antiga continuar aparecendo, descomente a linha abaixo,
+    // recarregue a página, e depois comente novamente.
+    // localStorage.removeItem('gemini_key'); 
+
     const promptInput = document.getElementById('prompt-input');
     const sendBtn = document.getElementById('send-btn');
     const configBtn = document.getElementById('config-btn');
     const modal = document.getElementById('config-modal');
     const saveKeysBtn = document.getElementById('save-keys');
 
-    // Carrega chaves salvas ou usa a sua chave padrão
+    // Carrega chaves salvas ou usa a fixa do código
     loadKeys();
 
     // -- Modal Config --
@@ -42,25 +49,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const prompt = promptInput.value;
         if (!prompt) return alert('Digite um prompt!');
 
-        // Recupera as chaves (do storage ou a fixa do código)
+        // 1. Tenta pegar do armazenamento do navegador
         let geminiKey = localStorage.getItem('gemini_key');
         
-        // SE não tiver chave salva, usa a que você forneceu
+        // 2. Se não tiver no navegador, usa a constante do código
         if (!geminiKey) {
             geminiKey = MY_GEMINI_KEY;
-            // Salva automaticamente para facilitar
-            localStorage.setItem('gemini_key', geminiKey);
+            // Se a constante estiver preenchida, salva para o futuro
+            if (geminiKey) {
+                localStorage.setItem('gemini_key', geminiKey);
+            }
+        }
+
+        // Validação final da chave
+        if (!geminiKey) {
+            alert('Você precisa configurar uma chave API do Gemini (no código ou no botão de engrenagem).');
+            modal.classList.remove('hidden');
+            return;
         }
 
         const groqKey = localStorage.getItem('groq_key');
-
-        // Verifica apenas Groq, pois Gemini já garantimos acima
-        if (!groqKey) {
-            alert('A chave do Gemini foi configurada, mas falta a da Groq (Llama). Configure no botão de engrenagem se quiser usar os outros modelos!');
-            // Se quiser permitir rodar só o Gemini, remova o return abaixo
-            // modal.classList.remove('hidden');
-            // return; 
-        }
 
         // Resetar UI e Timers
         setLoading('gemini', 'Gemini 1.5 Flash');
@@ -68,8 +76,8 @@ document.addEventListener('DOMContentLoaded', () => {
             setLoading('groq1', 'Llama 3.3 (Smart)');
             setLoading('groq2', 'Llama 3.1 (Fast)');
         } else {
-             document.getElementById(`output-groq1`).innerHTML = '<small>Sem chave Groq</small>';
-             document.getElementById(`output-groq2`).innerHTML = '<small>Sem chave Groq</small>';
+             document.getElementById(`output-groq1`).innerHTML = '<small style="opacity:0.5">Sem chave Groq configurada</small>';
+             document.getElementById(`output-groq2`).innerHTML = '<small style="opacity:0.5">Sem chave Groq configurada</small>';
         }
 
         // Disparar requisições
@@ -78,14 +86,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (groqKey) {
             fetchGroq(prompt, groqKey, MODELS.groqSmart, 'groq1');
             fetchGroq(prompt, groqKey, MODELS.groqFast, 'groq2');
+        } else {
+            // Apenas avisa se não tiver Groq, mas não trava o Gemini
+            console.log("Groq não configurado, pulando...");
         }
     };
 
     function loadKeys() {
-        // Preenche o input com o que está no storage, ou com a sua chave fixa
+        // Tenta carregar do storage. Se não existir, tenta carregar da constante.
         const savedGemini = localStorage.getItem('gemini_key');
-        document.getElementById('gemini-key').value = savedGemini || MY_GEMINI_KEY;
         
+        // Prioridade visual: Storage > Constante Code
+        document.getElementById('gemini-key').value = savedGemini || MY_GEMINI_KEY;
         document.getElementById('groq-key').value = localStorage.getItem('groq_key') || '';
     }
 
@@ -106,7 +118,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!contentDiv) return;
 
         try {
-            // Verifica se a biblioteca marked existe, senão usa texto puro
             if (typeof marked !== 'undefined') {
                 contentDiv.innerHTML = marked.parse(text);
             } else {
@@ -135,11 +146,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- GOOGLE GEMINI (API V1BETA / V1) ---
+    // --- GOOGLE GEMINI (API V1BETA) ---
     async function fetchGemini(prompt, apiKey) {
         const start = performance.now();
         try {
-            // URL corrigida para garantir compatibilidade
+            // URL da API (usando v1beta para garantir suporte ao Flash 1.5)
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini}:generateContent?key=${apiKey}`;
 
             const response = await fetch(url, {
@@ -154,15 +165,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const data = await response.json();
 
+            // Tratamento de erros detalhado
             if (data.error) {
                 let msg = data.error.message || "Erro desconhecido.";
-                if (msg.includes("API key not valid")) msg = "Sua chave API está inválida.";
+                if (msg.includes("API key not valid")) msg = "Sua chave API está inválida ou expirada.";
+                if (msg.includes("not found")) msg = "Modelo não encontrado. Verifique se a chave API tem acesso ao 'Google AI Studio'.";
                 throw new Error(msg);
             }
 
-            // --- CORREÇÃO PRINCIPAL AQUI ---
-            // A estrutura correta é candidates[0].content.parts[0].text
-            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Sem resposta do Gemini.";
+            // Extração da resposta
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "O Gemini não retornou texto.";
 
             updateResult('gemini', text, start);
 
