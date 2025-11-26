@@ -1,31 +1,23 @@
-// --- CONFIGURAÇÃO DOS MODELOS ---
+/* Configuração global dos modelos de IA e 
+   definição da chave fixa (opcional) para a Groq.
+*/
 const MODELS = {
-    // Slot 1: Usando Pollinations (Gratuito, sem chave, sem erro CORS)
-    // Opções: 'openai' (GPT-4o-mini), 'mistral', 'searchgpt'
     pollinations: 'openai', 
-
-    // Groq: Llama 3.3 (Smart)
     groqSmart: 'llama-3.3-70b-versatile',
-
-    // Groq: Llama 3.1 (Fast)
     groqFast: 'llama-3.1-8b-instant'
 };
 
-// ---------------------------------------------------------
-// 🔒 COLE APENAS SUA CHAVE DA GROQ AQUI
-// (Começa com "gsk_...")
-// O Slot 1 (Pollinations) NÃO precisa mais de chave!
-// ---------------------------------------------------------
 const MY_GROQ_KEY = ''; 
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- LIMPEZA E ATUALIZAÇÃO ---
+    /* Inicialização: Gerenciamento de chaves no LocalStorage 
+       e limpeza de dados legados (chaves antigas).
+    */
     if (MY_GROQ_KEY && MY_GROQ_KEY.length > 10) {
         localStorage.setItem('groq_key', MY_GROQ_KEY.trim());
     }
 
-    // Limpa chaves antigas do Gemini/HF para não confundir
     localStorage.removeItem('hf_key'); 
     localStorage.removeItem('gemini_key');
 
@@ -35,11 +27,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('config-modal');
     const saveKeysBtn = document.getElementById('save-keys');
 
-    // Atualiza interface para refletir a mudança
     updateInterfaceNames();
     loadKeys();
 
-    // -- Modal Config --
+    /* Configuração dos Event Listeners para controle do Modal 
+       de configurações e salvamento manual das chaves.
+    */
     configBtn.onclick = () => modal.classList.remove('hidden');
 
     saveKeysBtn.onclick = () => {
@@ -51,15 +44,15 @@ document.addEventListener('DOMContentLoaded', () => {
         loadKeys();
     };
 
-    // -- Botão Enviar --
+    /* Lógica principal de envio: Validação do prompt, redefinição da UI,
+       verificação de chaves e disparo paralelo das requisições.
+    */
     sendBtn.onclick = async () => {
         const prompt = promptInput.value;
         if (!prompt) return alert('Digite um prompt!');
 
         const groqKey = localStorage.getItem('groq_key');
 
-        // Resetar UI
-        // Slot 1 agora é Pollinations (GPT-4o-mini)
         setLoading('gemini', 'Pollinations.ai (GPT-4o-mini)'); 
         
         if(groqKey) {
@@ -70,14 +63,9 @@ document.addEventListener('DOMContentLoaded', () => {
              document.getElementById(`output-groq2`).innerHTML = '<small>Sem chave Groq</small>';
         }
 
-        // --- DISPAROS ---
-        
-        // 1. Pollinations (Não precisa de chave)
         fetchPollinations(prompt);
         
-        // 2. Groq (Precisa de chave)
         if (groqKey) {
-            // Verifica se a chave parece válida antes de enviar
             if (!groqKey.startsWith('gsk_')) {
                 showError('groq1', 'Chave Groq inválida. Ela deve começar com "gsk_". Verifique nas configurações.');
                 showError('groq2', 'Chave inválida.');
@@ -88,18 +76,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    /* Funções auxiliares para manipulação do DOM, controle de estado 
+       de carregamento, renderização de Markdown e exibição de erros.
+    */
     function updateInterfaceNames() {
-        // Ajusta os nomes no HTML via JS para não precisar mexer no index.html
         const header1 = document.querySelector('.hf-header span') || document.querySelector('.gemini-header span');
         if(header1) header1.innerText = "🔮 Pollinations (GPT-4o)";
         
-        // Esconde o input da chave 1 no modal, pois não é mais necessária
         const input1 = document.getElementById('gemini-key');
         if(input1) {
             input1.disabled = true;
             input1.placeholder = "Não é necessária chave para este modelo!";
             input1.style.opacity = "0.5";
-            // Tenta achar a label anterior
             const label = input1.previousElementSibling;
             if(label) label.innerText = "Pollinations AI (Grátis - Sem Chave):";
         }
@@ -154,28 +142,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- POLLINATIONS.AI (Substituto do Gemini/HF) ---
+    /* Integração com a API da Pollinations.ai (Modelo Gratuito).
+       Realiza requisição GET e processa a resposta como texto puro.
+    */
     async function fetchPollinations(prompt) {
         const start = performance.now();
         try {
-            // Pollinations aceita GET direto na URL para texto
-            // Codificamos o prompt para URL
             const url = `https://text.pollinations.ai/${encodeURIComponent(prompt)}?model=${MODELS.pollinations}`;
 
             const response = await fetch(url);
 
             if (!response.ok) throw new Error("Erro na Pollinations AI");
 
-            const text = await response.text(); // A resposta vem como texto puro
+            const text = await response.text();
             
-            updateResult('gemini', text, start); // Usando o slot visual do Gemini
+            updateResult('gemini', text, start);
 
         } catch (error) {
             showError('gemini', "Pollinations falhou: " + error.message);
         }
     }
 
-    // --- GROQ API ---
+    /* Integração com a API da Groq (Llama).
+       Realiza requisição POST com autenticação Bearer e processa JSON.
+    */
     async function fetchGroq(prompt, apiKey, model, elementId) {
         const start = performance.now();
         try {
