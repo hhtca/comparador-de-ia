@@ -16,10 +16,15 @@ const MODELS = {
 const MY_GEMINI_KEY = ''; 
 
 document.addEventListener('DOMContentLoaded', () => {
-    
-    // --- DICA: Se a chave antiga continuar aparecendo, descomente a linha abaixo,
-    // recarregue a página, e depois comente novamente.
-    // localStorage.removeItem('gemini_key'); 
+
+    // --- CORREÇÃO DE CACHE (Forçar a nova chave) ---
+    // Se você colocou uma chave no código acima, nós forçamos
+    // o navegador a esquecer a antiga e usar essa nova agora.
+    if (MY_GEMINI_KEY && MY_GEMINI_KEY.trim() !== '') {
+        console.log("Forçando atualização da chave Gemini pelo código...");
+        localStorage.setItem('gemini_key', MY_GEMINI_KEY);
+    }
+    // ------------------------------------------------
 
     const promptInput = document.getElementById('prompt-input');
     const sendBtn = document.getElementById('send-btn');
@@ -49,16 +54,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const prompt = promptInput.value;
         if (!prompt) return alert('Digite um prompt!');
 
-        // 1. Tenta pegar do armazenamento do navegador
+        // Recupera a chave atualizada do storage
         let geminiKey = localStorage.getItem('gemini_key');
         
-        // 2. Se não tiver no navegador, usa a constante do código
-        if (!geminiKey) {
+        // Fallback de segurança: Se o storage falhar, pega a do código
+        if (!geminiKey || geminiKey === 'undefined') {
             geminiKey = MY_GEMINI_KEY;
-            // Se a constante estiver preenchida, salva para o futuro
-            if (geminiKey) {
-                localStorage.setItem('gemini_key', geminiKey);
-            }
         }
 
         // Validação final da chave
@@ -87,16 +88,13 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchGroq(prompt, groqKey, MODELS.groqSmart, 'groq1');
             fetchGroq(prompt, groqKey, MODELS.groqFast, 'groq2');
         } else {
-            // Apenas avisa se não tiver Groq, mas não trava o Gemini
             console.log("Groq não configurado, pulando...");
         }
     };
 
     function loadKeys() {
-        // Tenta carregar do storage. Se não existir, tenta carregar da constante.
+        // Atualiza os inputs visuais
         const savedGemini = localStorage.getItem('gemini_key');
-        
-        // Prioridade visual: Storage > Constante Code
         document.getElementById('gemini-key').value = savedGemini || MY_GEMINI_KEY;
         document.getElementById('groq-key').value = localStorage.getItem('groq_key') || '';
     }
@@ -150,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchGemini(prompt, apiKey) {
         const start = performance.now();
         try {
-            // URL da API (usando v1beta para garantir suporte ao Flash 1.5)
+            // URL da API
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini}:generateContent?key=${apiKey}`;
 
             const response = await fetch(url, {
@@ -165,15 +163,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const data = await response.json();
 
-            // Tratamento de erros detalhado
+            // Tratamento de erros
             if (data.error) {
                 let msg = data.error.message || "Erro desconhecido.";
                 if (msg.includes("API key not valid")) msg = "Sua chave API está inválida ou expirada.";
-                if (msg.includes("not found")) msg = "Modelo não encontrado. Verifique se a chave API tem acesso ao 'Google AI Studio'.";
+                if (msg.includes("not found")) msg = "Modelo não encontrado ou Chave sem Permissão. (Verifique se criou a chave no Google AI Studio)";
                 throw new Error(msg);
             }
 
-            // Extração da resposta
             const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "O Gemini não retornou texto.";
 
             updateResult('gemini', text, start);
@@ -213,4 +210,3 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
-
