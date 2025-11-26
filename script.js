@@ -1,12 +1,12 @@
-// --- CONFIGURAÇÃO DOS MODELOS (Versão Estável - Nov/2025) ---
+// --- CONFIGURAÇÃO DOS MODELOS (Versão "Blindada" - Nov/2025) ---
 const MODELS = {
-    // Google: Usando 'latest' e endpoint V1 para evitar erro de "Not Found"
-    gemini: 'gemini-1.5-flash-latest', 
+    // Google: Nome padrão, sem 'latest', rodando na v1beta
+    gemini: 'gemini-1.5-flash', 
     
-    // Groq: Llama 3.3 (O mais inteligente atual)
+    // Groq: Llama 3.3 (Versatile) - O mais novo da Meta
     groqSmart: 'llama-3.3-70b-versatile', 
     
-    // Groq: Llama 3.1 8b (O mais rápido)
+    // Groq: Llama 3.1 (Instant) - O mais rápido
     groqFast: 'llama-3.1-8b-instant'
 };
 
@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadKeys();
 
-    // -- Configuração do Modal --
+    // -- Modal Config --
     configBtn.onclick = () => modal.classList.remove('hidden');
     saveKeysBtn.onclick = () => {
         const geminiVal = document.getElementById('gemini-key').value.trim();
@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
         alert('Chaves salvas! Tente enviar o prompt novamente.');
     };
 
-    // -- Botão Enviar --
+    // -- Enviar Prompt --
     sendBtn.onclick = async () => {
         const prompt = promptInput.value;
         if (!prompt) return alert('Digite um prompt!');
@@ -88,12 +88,12 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>`;
     }
 
-    // --- GOOGLE GEMINI (Endpoint V1 Estável) ---
+    // --- GOOGLE GEMINI (Volta para v1beta que é mais permissivo) ---
     async function fetchGemini(prompt, apiKey) {
         const start = performance.now();
         try {
-            // MUDANÇA IMPORTANTE: Mudamos de 'v1beta' para 'v1'
-            const url = `https://generativelanguage.googleapis.com/v1/models/${MODELS.gemini}:generateContent?key=${apiKey}`;
+            // URL v1beta padrão
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini}:generateContent?key=${apiKey}`;
             
             const response = await fetch(url, {
                 method: 'POST',
@@ -105,9 +105,9 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (data.error) {
                 let msg = data.error.message;
-                // Se ainda der erro, sugerimos o modelo Pro antigo que é infalível
-                if (msg.includes('not found')) {
-                    throw new Error(`Modelo Flash não encontrado na v1. Tente usar 'gemini-pro' no código ou crie uma nova chave API.`);
+                // Tratamento específico se a chave não tiver acesso ao Flash
+                if (msg.includes('not found') || msg.includes('404')) {
+                    throw new Error(`Modelo Flash não encontrado. Verifique sua API Key no Google AI Studio.`);
                 }
                 throw new Error(msg);
             }
@@ -140,7 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.error) {
                 if (data.error.code === 'model_not_found') {
-                    throw new Error(`Modelo ${model} descontinuado. Atualize o script.`);
+                    throw new Error(`Modelo ${model} parece ter sido desativado. Verifique o console da Groq.`);
                 }
                 throw new Error(data.error.message);
             }
