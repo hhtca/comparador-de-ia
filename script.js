@@ -1,12 +1,12 @@
-// --- CONFIGURAÇÃO DOS MODELOS (Atualizado Nov/2025) ---
+// --- CONFIGURAÇÃO DOS MODELOS (Versão Estável - Nov/2025) ---
 const MODELS = {
-    // Google: Modelo leve e rápido
-    gemini: 'gemini-1.5-flash', 
+    // Google: Usando 'latest' e endpoint V1 para evitar erro de "Not Found"
+    gemini: 'gemini-1.5-flash-latest', 
     
-    // Groq: O novo modelo "inteligente" da Meta (Substituto do 3.1-70b)
+    // Groq: Llama 3.3 (O mais inteligente atual)
     groqSmart: 'llama-3.3-70b-versatile', 
     
-    // Groq: Modelo ultra-rápido (Substituto do Mixtral)
+    // Groq: Llama 3.1 8b (O mais rápido)
     groqFast: 'llama-3.1-8b-instant'
 };
 
@@ -19,10 +19,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadKeys();
 
-    // -- Modal Config --
+    // -- Configuração do Modal --
     configBtn.onclick = () => modal.classList.remove('hidden');
     saveKeysBtn.onclick = () => {
-        // .trim() remove espaços vazios acidentais no início/fim da chave
         const geminiVal = document.getElementById('gemini-key').value.trim();
         const groqVal = document.getElementById('groq-key').value.trim();
         
@@ -32,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
         alert('Chaves salvas! Tente enviar o prompt novamente.');
     };
 
-    // -- Enviar Prompt --
+    // -- Botão Enviar --
     sendBtn.onclick = async () => {
         const prompt = promptInput.value;
         if (!prompt) return alert('Digite um prompt!');
@@ -46,12 +45,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Limpa a tela e mostra loading
+        // Resetar UI
         setLoading('gemini', 'Gemini 1.5 Flash');
         setLoading('groq1', 'Llama 3.3 (Smart)');
         setLoading('groq2', 'Llama 3.1 (Fast)');
 
-        // Dispara as 3 requisições ao mesmo tempo
+        // Disparar requisições
         fetchGemini(prompt, geminiKey);
         fetchGroq(prompt, groqKey, MODELS.groqSmart, 'groq1');
         fetchGroq(prompt, groqKey, MODELS.groqFast, 'groq2');
@@ -62,10 +61,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('groq-key').value = localStorage.getItem('groq_key') || '';
     }
 
-    function setLoading(id, modelName) {
+    function setLoading(id, name) {
         document.getElementById(`output-${id}`).innerHTML = `
             <div style="text-align:center; padding:20px; opacity:0.6; color: #89b4fa;">
-                ⏳ Consultando <b>${modelName}</b>...
+                ⏳ Consultando <b>${name}</b>...
             </div>`;
         document.getElementById(`timer-${id}`).innerText = '--';
     }
@@ -84,16 +83,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showError(id, msg) {
         document.getElementById(`output-${id}`).innerHTML = `
-            <div style="color: #ff8888; border: 1px solid #ff5555; padding: 10px; border-radius: 5px;">
+            <div style="color: #ff8888; border: 1px solid #ff5555; background: rgba(255,0,0,0.1); padding: 10px; border-radius: 5px; font-size: 0.85rem;">
                 ⚠️ <b>Erro:</b> ${msg}
             </div>`;
     }
 
-    // --- INTEGRAÇÃO GOOGLE GEMINI ---
+    // --- GOOGLE GEMINI (Endpoint V1 Estável) ---
     async function fetchGemini(prompt, apiKey) {
         const start = performance.now();
         try {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini}:generateContent?key=${apiKey}`;
+            // MUDANÇA IMPORTANTE: Mudamos de 'v1beta' para 'v1'
+            const url = `https://generativelanguage.googleapis.com/v1/models/${MODELS.gemini}:generateContent?key=${apiKey}`;
             
             const response = await fetch(url, {
                 method: 'POST',
@@ -105,7 +105,10 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (data.error) {
                 let msg = data.error.message;
-                if (msg.includes('not found')) msg += " <br><br><b>Solução:</b> Verifique se a chave está correta ou se o 'AI Studio' está habilitado na sua conta Google.";
+                // Se ainda der erro, sugerimos o modelo Pro antigo que é infalível
+                if (msg.includes('not found')) {
+                    throw new Error(`Modelo Flash não encontrado na v1. Tente usar 'gemini-pro' no código ou crie uma nova chave API.`);
+                }
                 throw new Error(msg);
             }
 
@@ -116,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- INTEGRAÇÃO GROQ (Llama) ---
+    // --- GROQ (Llama) ---
     async function fetchGroq(prompt, apiKey, model, elementId) {
         const start = performance.now();
         try {
@@ -136,9 +139,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (data.error) {
-                // Se o erro for de modelo não encontrado, avisamos qual modelo falhou
-                if (data.error.code === 'model_not_found' || data.error.message.includes('decommissioned')) {
-                    throw new Error(`O modelo <b>${model}</b> foi desativado pela Groq. Verifique o script.js.`);
+                if (data.error.code === 'model_not_found') {
+                    throw new Error(`Modelo ${model} descontinuado. Atualize o script.`);
                 }
                 throw new Error(data.error.message);
             }
